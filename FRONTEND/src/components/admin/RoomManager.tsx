@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { fetchRooms, createRoom, updateRoom, deleteRoom } from '@/services/api';
-import { Plus, Pencil, Trash2, Loader2, Image as ImageIcon, Calendar, Lock, Unlock } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Image as ImageIcon, Calendar, Lock, Unlock, Mail, FileText, Printer, Phone, MessageSquare, Clock, History, Filter, BarChart2, Download, Share2, MoreHorizontal, Check } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -14,6 +14,7 @@ import RoomFilters from './RoomFilters';
 import RoomStats from './RoomStats';
 import Notifications from './Notifications';
 import { notificationService } from '@/services/notifications';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 
 interface Room {
   _id: string;
@@ -43,6 +44,15 @@ interface Booking {
   totalPrice: number;
   guests?: number;
   specialRequests?: string;
+  checkInCompleted?: boolean;
+  checkOutCompleted?: boolean;
+  receptionNotes?: string;
+  history?: {
+    date: string;
+    action: string;
+    user: string;
+    details: string;
+  }[];
 }
 
 const RoomManager: React.FC = () => {
@@ -267,6 +277,222 @@ const RoomManager: React.FC = () => {
     setFilteredRooms(filtered);
   };
 
+  const handleSendConfirmationEmail = async (booking: Booking) => {
+    try {
+      await sendConfirmationEmail(booking._id);
+      toast({
+        title: "Email enviado",
+        description: "O email de confirmação foi enviado com sucesso.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro ao enviar email",
+        description: "Não foi possível enviar o email de confirmação.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleGenerateReceipt = async (booking: Booking) => {
+    try {
+      const receipt = await generateReceipt(booking._id);
+      window.open(receipt.url, '_blank');
+    } catch (error) {
+      toast({
+        title: "Erro ao gerar comprovante",
+        description: "Não foi possível gerar o comprovante.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleToggleCheckIn = async (booking: Booking) => {
+    try {
+      await updateBookingStatus(booking._id, { checkInCompleted: !booking.checkInCompleted });
+      loadRooms();
+      toast({
+        title: booking.checkInCompleted ? "Check-in desmarcado" : "Check-in realizado",
+        description: booking.checkInCompleted 
+          ? "O check-in foi desmarcado com sucesso."
+          : "O check-in foi registrado com sucesso.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro ao atualizar status",
+        description: "Não foi possível atualizar o status do check-in.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleToggleCheckOut = async (booking: Booking) => {
+    try {
+      await updateBookingStatus(booking._id, { checkOutCompleted: !booking.checkOutCompleted });
+      loadRooms();
+      toast({
+        title: booking.checkOutCompleted ? "Check-out desmarcado" : "Check-out realizado",
+        description: booking.checkOutCompleted 
+          ? "O check-out foi desmarcado com sucesso."
+          : "O check-out foi registrado com sucesso.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro ao atualizar status",
+        description: "Não foi possível atualizar o status do check-out.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAddReceptionNote = async (booking: Booking) => {
+    const note = window.prompt('Adicione uma observação para esta reserva:');
+    if (note) {
+      try {
+        await updateBookingStatus(booking._id, { receptionNotes: note });
+        loadRooms();
+        toast({
+          title: "Observação adicionada",
+          description: "A observação foi adicionada com sucesso.",
+        });
+      } catch (error) {
+        toast({
+          title: "Erro ao adicionar observação",
+          description: "Não foi possível adicionar a observação.",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  const handleExportBookings = async (room: Room) => {
+    try {
+      const data = await exportRoomBookings(room._id);
+      const blob = new Blob([data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `reservas-quarto-${room.roomNumber}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      toast({
+        title: "Erro ao exportar",
+        description: "Não foi possível exportar as reservas.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleViewStats = (room: Room) => {
+    // Implementar visualização de estatísticas
+    toast({
+      title: "Em desenvolvimento",
+      description: "Esta funcionalidade estará disponível em breve.",
+    });
+  };
+
+  const handleFilterBookings = (room: Room) => {
+    // Implementar filtros avançados
+    toast({
+      title: "Em desenvolvimento",
+      description: "Esta funcionalidade estará disponível em breve.",
+    });
+  };
+
+  const handleViewHistory = (room: Room) => {
+    // Implementar histórico de alterações
+    toast({
+      title: "Em desenvolvimento",
+      description: "Esta funcionalidade estará disponível em breve.",
+    });
+  };
+
+  const handlePrintBooking = async (booking: Booking) => {
+    try {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        const content = `
+          <html>
+            <head>
+              <title>Reserva #${booking._id}</title>
+              <style>
+                body { font-family: Arial, sans-serif; padding: 20px; }
+                .header { text-align: center; margin-bottom: 20px; }
+                .details { margin-bottom: 20px; }
+                .footer { text-align: center; margin-top: 40px; }
+              </style>
+            </head>
+            <body>
+              <div class="header">
+                <h1>Comprovante de Reserva</h1>
+              </div>
+              <div class="details">
+                <p><strong>Hóspede:</strong> ${booking.user.username}</p>
+                <p><strong>Email:</strong> ${booking.user.email}</p>
+                <p><strong>Check-in:</strong> ${format(new Date(booking.checkInDate), 'dd/MM/yyyy', { locale: ptBR })}</p>
+                <p><strong>Check-out:</strong> ${format(new Date(booking.checkOutDate), 'dd/MM/yyyy', { locale: ptBR })}</p>
+                <p><strong>Valor Total:</strong> R$ ${booking.totalPrice.toFixed(2)}</p>
+              </div>
+              <div class="footer">
+                <p>Hotel - Todos os direitos reservados</p>
+              </div>
+            </body>
+          </html>
+        `;
+        printWindow.document.write(content);
+        printWindow.document.close();
+        printWindow.print();
+      }
+    } catch (error) {
+      toast({
+        title: "Erro ao imprimir",
+        description: "Não foi possível imprimir a reserva.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleShareBooking = async (booking: Booking) => {
+    try {
+      const shareData = {
+        title: 'Detalhes da Reserva',
+        text: `Reserva de ${booking.user.username} - Check-in: ${format(new Date(booking.checkInDate), 'dd/MM/yyyy', { locale: ptBR })}`,
+        url: window.location.href
+      };
+      await navigator.share(shareData);
+    } catch (error) {
+      toast({
+        title: "Erro ao compartilhar",
+        description: "Não foi possível compartilhar a reserva.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleCallGuest = (booking: Booking) => {
+    if (booking.user.phone) {
+      window.location.href = `tel:${booking.user.phone}`;
+    }
+  };
+
+  const handleSendMessage = (booking: Booking) => {
+    // Implementar envio de mensagem
+    toast({
+      title: "Em desenvolvimento",
+      description: "Esta funcionalidade estará disponível em breve.",
+    });
+  };
+
+  const handleViewTimeline = (booking: Booking) => {
+    // Implementar visualização de timeline
+    toast({
+      title: "Em desenvolvimento",
+      description: "Esta funcionalidade estará disponível em breve.",
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -371,7 +597,42 @@ const RoomManager: React.FC = () => {
                       </div>
                     </TabsContent>
                     <TabsContent value="bookings">
-                      <div className="mt-2 space-y-2">
+                      <div className="mt-2 space-y-4">
+                        <div className="flex flex-wrap justify-between items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleExportBookings(room)}
+                            title="Exportar reservas"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewStats(room)}
+                            title="Ver estatísticas"
+                          >
+                            <BarChart2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleFilterBookings(room)}
+                            title="Filtrar reservas"
+                          >
+                            <Filter className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewHistory(room)}
+                            title="Ver histórico"
+                          >
+                            <History className="h-4 w-4" />
+                          </Button>
+                        </div>
+
                         {room.bookings && room.bookings.length > 0 ? (
                           room.bookings.map((booking) => (
                             <div key={booking._id} className="text-sm border rounded p-3 bg-white dark:bg-hotel-900">
@@ -384,25 +645,71 @@ const RoomManager: React.FC = () => {
                                     {booking.user.email}
                                   </p>
                                 </div>
-                                <span className={`px-2 py-1 rounded-full text-xs ${
-                                  booking.status === 'confirmed' 
-                                    ? 'bg-green-100 text-green-800' 
-                                    : booking.status === 'cancelled'
-                                    ? 'bg-red-100 text-red-800'
-                                    : 'bg-yellow-100 text-yellow-800'
-                                }`}>
-                                  {booking.status === 'confirmed' ? 'Confirmada' : 
-                                   booking.status === 'cancelled' ? 'Cancelada' : 'Pendente'}
-                                </span>
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  <span className={`px-2 py-1 rounded-full text-xs ${
+                                    booking.status === 'confirmed' 
+                                      ? 'bg-green-100 text-green-800' 
+                                      : booking.status === 'cancelled'
+                                      ? 'bg-red-100 text-red-800'
+                                      : 'bg-yellow-100 text-yellow-800'
+                                  }`}>
+                                    {booking.status === 'confirmed' ? 'Confirmada' : 
+                                     booking.status === 'cancelled' ? 'Cancelada' : 'Pendente'}
+                                  </span>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0"
+                                      title="Enviar email de confirmação"
+                                      onClick={() => handleSendConfirmationEmail(booking)}
+                                    >
+                                      <Mail className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0"
+                                      title="Gerar comprovante"
+                                      onClick={() => handleGenerateReceipt(booking)}
+                                    >
+                                      <FileText className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0"
+                                      title="Imprimir reserva"
+                                      onClick={() => handlePrintBooking(booking)}
+                                    >
+                                      <Printer className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0"
+                                      title="Compartilhar reserva"
+                                      onClick={() => handleShareBooking(booking)}
+                                    >
+                                      <Share2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
                               </div>
                               
                               <div className="grid grid-cols-2 gap-2 mt-2">
                                 <div>
                                   <p className="text-hotel-600 dark:text-hotel-400">
                                     <strong>Check-in:</strong> {format(new Date(booking.checkInDate), 'dd/MM/yyyy', { locale: ptBR })}
+                                    {booking.checkInCompleted && (
+                                      <span className="ml-2 text-green-600">✓</span>
+                                    )}
                                   </p>
                                   <p className="text-hotel-600 dark:text-hotel-400">
                                     <strong>Check-out:</strong> {format(new Date(booking.checkOutDate), 'dd/MM/yyyy', { locale: ptBR })}
+                                    {booking.checkOutCompleted && (
+                                      <span className="ml-2 text-green-600">✓</span>
+                                    )}
                                   </p>
                                 </div>
                                 <div>
@@ -417,23 +724,59 @@ const RoomManager: React.FC = () => {
                                 </div>
                               </div>
 
-                              {booking.user.phone && (
-                                <p className="text-hotel-600 dark:text-hotel-400 mt-2">
-                                  <strong>Telefone:</strong> {booking.user.phone}
-                                </p>
-                              )}
-                              
-                              {booking.user.document && (
-                                <p className="text-hotel-600 dark:text-hotel-400">
-                                  <strong>Documento:</strong> {booking.user.document}
-                                </p>
-                              )}
-                              
-                              {booking.user.address && (
-                                <p className="text-hotel-600 dark:text-hotel-400">
-                                  <strong>Endereço:</strong> {booking.user.address}
-                                </p>
-                              )}
+                              {/* Informações de contato do hóspede */}
+                              <div className="mt-2 space-y-1">
+                                {booking.user.phone && (
+                                  <p className="text-hotel-600 dark:text-hotel-400 mt-2">
+                                    <strong>Telefone:</strong> {booking.user.phone}
+                                  </p>
+                                )}
+                                
+                                {booking.user.document && (
+                                  <p className="text-hotel-600 dark:text-hotel-400">
+                                    <strong>Documento:</strong> {booking.user.document}
+                                  </p>
+                                )}
+                                
+                                {booking.user.address && (
+                                  <p className="text-hotel-600 dark:text-hotel-400">
+                                    <strong>Endereço:</strong> {booking.user.address}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Botões de Ação de Comunicação */}
+                              <div className="flex gap-2 mt-4">
+                                <Select onValueChange={(value) => {
+                                  if (value === 'call') handleCallGuest(booking);
+                                  else if (value === 'message') handleSendMessage(booking);
+                                  else if (value === 'timeline') handleViewTimeline(booking);
+                                }}>
+                                  <SelectTrigger className="w-[120px] flex items-center justify-center gap-1">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                    Ações
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {booking.user.phone && (
+                                      <SelectItem value="call">
+                                        <div className="flex items-center gap-2">
+                                          <Phone className="h-4 w-4" /> Ligar
+                                        </div>
+                                      </SelectItem>
+                                    )}
+                                    <SelectItem value="message">
+                                      <div className="flex items-center gap-2">
+                                        <MessageSquare className="h-4 w-4" /> Mensagem
+                                      </div>
+                                    </SelectItem>
+                                    <SelectItem value="timeline">
+                                      <div className="flex items-center gap-2">
+                                        <Clock className="h-4 w-4" /> Timeline
+                                      </div>
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
 
                               {booking.specialRequests && (
                                 <div className="mt-2 p-2 bg-hotel-50 dark:bg-hotel-800 rounded">
@@ -445,6 +788,46 @@ const RoomManager: React.FC = () => {
                                   </p>
                                 </div>
                               )}
+
+                              {booking.receptionNotes && (
+                                <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded">
+                                  <p className="text-hotel-600 dark:text-hotel-400">
+                                    <strong>Observações da Recepção:</strong>
+                                  </p>
+                                  <p className="text-hotel-600 dark:text-hotel-400 text-sm">
+                                    {booking.receptionNotes}
+                                  </p>
+                                </div>
+                              )}
+
+                              <div className="mt-3 flex flex-wrap gap-1">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleToggleCheckIn(booking)}
+                                  disabled={booking.checkInCompleted}
+                                  title={booking.checkInCompleted ? 'Check-in Realizado' : 'Realizar Check-in'}
+                                >
+                                  {booking.checkInCompleted ? <Check className="h-4 w-4" /> : <Calendar className="h-4 w-4" />}
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleToggleCheckOut(booking)}
+                                  disabled={booking.checkOutCompleted}
+                                  title={booking.checkOutCompleted ? 'Check-out Realizado' : 'Realizar Check-out'}
+                                >
+                                  {booking.checkOutCompleted ? <Check className="h-4 w-4" /> : <Calendar className="h-4 w-4" />}
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleAddReceptionNote(booking)}
+                                  title="Adicionar observação"
+                                >
+                                  <MessageSquare className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
                           ))
                         ) : (

@@ -17,6 +17,9 @@ const reviewRoutes = require('./routes/reviews');
 app.use(express.json());
 app.use(cors());
 
+// Servir arquivos estáticos da pasta uploads
+app.use('/uploads', express.static('uploads'));
+
 // Conexão com o MongoDB
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,

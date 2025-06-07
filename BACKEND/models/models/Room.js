@@ -21,6 +21,14 @@ const roomSchema = new mongoose.Schema({
   description: {
     type: String,
   },
+  images: [{
+    type: String, // URLs das imagens
+    required: false
+  }],
+  amenities: [{
+    type: String, // Lista de comodidades (ex: "Wi-Fi", "Ar condicionado", etc)
+    required: false
+  }]
 });
 
 module.exports = mongoose.model('Room', roomSchema); 

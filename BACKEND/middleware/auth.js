@@ -1,23 +1,48 @@
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
-  if (token == null) {
-    // Se não houver token, retorna 401 Não Autorizado
-    return res.status(401).json({ message: 'Acesso negado. Token não fornecido.' });
+  if (!token) {
+    return res.status(401).json({ 
+      message: 'Não autorizado. Por favor, faça login para continuar.' 
+    });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      // Se o token for inválido, retorna 403 Proibido
-      return res.status(403).json({ message: 'Token inválido.' });
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'segredo');
+    
+    // Garantir que o ID do usuário seja um ObjectId válido
+    if (!mongoose.Types.ObjectId.isValid(decoded.id)) {
+      return res.status(401).json({ 
+        message: 'Token inválido. Por favor, faça login novamente.' 
+      });
     }
-
-    req.user = user; // Anexa as informações do usuário ao objeto de requisição
-    next(); // Continua para a próxima função middleware ou rota
-  });
+    
+    req.user = decoded;
+    next();
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ 
+        message: 'Sua sessão expirou. Por favor, faça login novamente.' 
+      });
+    }
+    return res.status(401).json({ 
+      message: 'Token inválido. Por favor, faça login novamente.' 
+    });
+  }
 };
 
-module.exports = { verifyToken }; 
+// Middleware para verificar se o usuário é admin
+const verifyAdmin = (req, res, next) => {
+  if (!req.user || !req.user.isAdmin) {
+    return res.status(403).json({ 
+      message: 'Acesso negado. Você precisa ser um administrador para realizar esta ação.' 
+    });
+  }
+  next();
+};
+
+module.exports = { verifyToken, verifyAdmin }; 

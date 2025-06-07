@@ -3,7 +3,8 @@ const router = express.Router();
 const Review = require('../models/Review');
 const User = require('../models/models/User'); // Importar modelo de usuário se a referência for usada
 const jwt = require('jsonwebtoken');
-const { verifyToken } = require('../middleware/auth'); // Corrigir importação do middleware de auth
+const mongoose = require('mongoose');
+const { verifyToken, verifyAdmin } = require('../middleware/auth'); // Corrigir importação do middleware de auth
 
 // Middleware para obter o usuário logado (se houver)
 const getUserFromToken = (req, res, next) => {
@@ -15,14 +16,21 @@ const getUserFromToken = (req, res, next) => {
     return next();
   }
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      req.user = null; 
-    } else {
-      req.user = user; // Usuário decodificado do token
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'segredo');
+    
+    // Garantir que o ID do usuário seja um ObjectId válido
+    if (!mongoose.Types.ObjectId.isValid(decoded.id)) {
+      req.user = null;
+      return next();
     }
+    
+    req.user = decoded;
     next();
-  });
+  } catch (error) {
+    req.user = null;
+    next();
+  }
 };
 
 // Aplicar middleware para todas as rotas de review
@@ -31,34 +39,61 @@ router.use(getUserFromToken);
 // GET /api/reviews - Listar todas as avaliações
 router.get('/', async (req, res) => {
   try {
-    // Popular o campo 'user' com nome de usuário e email (opcional, ajuste conforme necessário)
-    const reviews = await Review.find().populate('user', 'username email');
-    res.json(reviews);
+    const reviews = await Review.find()
+      .populate('user', 'username email')
+      .sort({ createdAt: -1 }); // Ordenar por data de criação, mais recentes primeiro
+    
+    // Formatar as avaliações para incluir informações do usuário
+    const formattedReviews = reviews.map(review => ({
+      _id: review._id,
+      quote: review.quote,
+      author: review.author || (review.user ? review.user.username : 'Anônimo'),
+      location: review.location,
+      rating: review.rating,
+      user: review.user,
+      createdAt: review.createdAt,
+      image: review.image
+    }));
+
+    res.json(formattedReviews);
   } catch (err) {
+    console.error('Erro ao buscar avaliações:', err);
     res.status(500).json({ message: err.message });
   }
 });
 
 // POST /api/reviews - Criar uma nova avaliação (requer autenticação)
 router.post('/', verifyToken, async (req, res) => {
-  const review = new Review({
-    author: req.body.author,
-    location: req.body.location,
-    quote: req.body.quote,
-    rating: req.body.rating,
-    // Associar avaliação ao usuário logado
-    user: req.user ? req.user._id : null, 
-  });
-
   try {
+    // Verificar se o usuário existe
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(401).json({ 
+        message: 'Usuário não encontrado. Por favor, faça login novamente.' 
+      });
+    }
+
+    const review = new Review({
+      author: req.body.author,
+      location: req.body.location,
+      quote: req.body.quote,
+      rating: req.body.rating,
+      user: req.user.id
+    });
+
     const newReview = await review.save();
-    res.status(201).json(newReview);
+    
+    // Popular os dados do usuário antes de retornar
+    const populatedReview = await Review.findById(newReview._id).populate('user', 'username email');
+    
+    res.status(201).json(populatedReview);
   } catch (err) {
+    console.error('Erro ao criar avaliação:', err);
     res.status(400).json({ message: err.message });
   }
 });
 
-// DELETE /api/reviews/:id - Deletar uma avaliação (exemplo, pode adicionar verificação de quem pode deletar)
+// DELETE /api/reviews/:id - Deletar uma avaliação
 router.delete('/:id', verifyToken, async (req, res) => {
   try {
     const review = await Review.findById(req.params.id);
@@ -66,13 +101,23 @@ router.delete('/:id', verifyToken, async (req, res) => {
       return res.status(404).json({ message: 'Avaliação não encontrada' });
     }
     
-    // Opcional: Verificar se o usuário logado é o autor da avaliação ou um admin para permitir a exclusão
-    // if (review.user.toString() !== req.user._id && !req.user.isAdmin) {
-    //   return res.status(403).json({ message: 'Você não tem permissão para deletar esta avaliação' });
-    // }
+    // Verificar se o usuário logado é o autor da avaliação ou um admin
+    if (review.user.toString() !== req.user.id && !req.user.isAdmin) {
+      return res.status(403).json({ message: 'Você não tem permissão para deletar esta avaliação' });
+    }
 
-    await review.remove();
+    await Review.findByIdAndDelete(req.params.id);
     res.json({ message: 'Avaliação removida' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Rota para admin deletar todas as avaliações
+router.delete('/admin/clear', verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    await Review.deleteMany({});
+    res.json({ message: 'Todas as avaliações foram removidas' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

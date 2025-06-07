@@ -19,6 +19,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  profilePic: {
+    type: String,
+    default: '/images/sem-perfil.jpg'
+  }
 });
 
 module.exports = mongoose.model('User', userSchema); 

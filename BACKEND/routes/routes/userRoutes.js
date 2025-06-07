@@ -3,24 +3,48 @@ const router = express.Router();
 const User = require('../../models/models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { sendLoginNotification } = require('../../services/emailService');
 
 
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
+
+  // Validar se os campos necessários foram fornecidos
+  if (!email || !password) {
+    return res.status(400).json({ 
+      message: 'E-mail e senha são obrigatórios' 
+    });
+  }
+
   try {
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(400).json({ message: 'Usuário não encontrado' });
+      return res.status(400).json({ 
+        message: 'E-mail ou senha incorretos' 
+      });
     }
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(400).json({ message: 'Senha incorreta' });
+      return res.status(400).json({ 
+        message: 'E-mail ou senha incorretos' 
+      });
     }
+
     const token = jwt.sign(
       { id: user._id, email: user.email, username: user.username, isAdmin: user.isAdmin },
       process.env.JWT_SECRET || 'segredo',
       { expiresIn: '1d' }
     );
+
+    // Enviar email de notificação
+    try {
+      await sendLoginNotification(user.email, user.username);
+    } catch (emailError) {
+      console.error('Erro ao enviar email de notificação:', emailError);
+      // Não interrompe o login se o email falhar
+    }
+
     res.json({
       token,
       user: {
@@ -31,7 +55,10 @@ router.post('/login', async (req, res) => {
       }
     });
   } catch (err) {
-    res.status(500).json({ message: 'Erro no login', error: err.message });
+    console.error('Erro no login:', err);
+    res.status(500).json({ 
+      message: 'Erro interno do servidor. Por favor, tente novamente mais tarde.' 
+    });
   }
 });
 
