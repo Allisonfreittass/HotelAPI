@@ -73,10 +73,14 @@ export const loginUser = async (email: string, password: string) => {
       },
       body: JSON.stringify({ email, password }),
     });
+    
+    const data = await response.json();
+    
     if (!response.ok) {
-      throw new Error(`Erro ao fazer login: ${response.statusText}`);
+      throw new Error(data.message || `Erro ao fazer login: ${response.statusText}`);
     }
-    return await response.json();
+    
+    return data;
   } catch (error) {
     console.error('Erro ao fazer login:', error);
     throw error;
@@ -162,33 +166,243 @@ export const fetchReviews = async () => {
 
 export const createReview = async (reviewData: any) => {
   try {
-    // Obter o token do localStorage (assumindo que você o armazena lá)
-    const authToken = localStorage.getItem('authToken'); 
+    const authToken = localStorage.getItem('authToken');
+    
+    if (!authToken) {
+      throw new Error('Não autorizado. Por favor, faça login para enviar sua avaliação.');
+    }
     
     const response = await fetch(`${API_BASE_URL}/reviews`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Incluir o token no cabeçalho Authorization
         'Authorization': `Bearer ${authToken}`,
       },
       body: JSON.stringify(reviewData),
     });
     
-    // Se a resposta for 401 ou 403, o token pode estar inválido ou expirado
-    if (response.status === 401 || response.status === 403) {
-      // Opcional: redirecionar para login ou limpar token
-      // localStorage.removeItem('authToken');
-      // window.location.href = '/login';
-      throw new Error('Não autorizado. Por favor, faça login novamente.');
+    const data = await response.json();
+    
+    if (response.status === 401) {
+      // Token expirado ou inválido
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      throw new Error(data.message || 'Sua sessão expirou. Por favor, faça login novamente.');
+    }
+
+    if (response.status === 403) {
+      // Acesso negado
+      throw new Error(data.message || 'Você não tem permissão para realizar esta ação.');
     }
 
     if (!response.ok) {
-      throw new Error(`Erro ao criar avaliação: ${response.statusText}`);
+      throw new Error(data.message || `Erro ao criar avaliação: ${response.statusText}`);
     }
-    return await response.json();
+
+    return data;
   } catch (error) {
     console.error('Erro ao criar avaliação:', error);
+    throw error;
+  }
+};
+
+export const deleteReview = async (reviewId: string) => {
+  try {
+    const authToken = localStorage.getItem('authToken');
+    
+    if (!authToken) {
+      throw new Error('Não autorizado. Por favor, faça login para continuar.');
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/reviews/${reviewId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+      },
+    });
+    
+    const data = await response.json();
+    
+    if (response.status === 401) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      throw new Error(data.message || 'Sua sessão expirou. Por favor, faça login novamente.');
+    }
+
+    if (response.status === 403) {
+      throw new Error(data.message || 'Você não tem permissão para realizar esta ação.');
+    }
+
+    if (!response.ok) {
+      throw new Error(data.message || `Erro ao deletar avaliação: ${response.statusText}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Erro ao deletar avaliação:', error);
+    throw error;
+  }
+};
+
+export const clearAllReviews = async () => {
+  try {
+    const authToken = localStorage.getItem('authToken');
+    
+    if (!authToken) {
+      throw new Error('Não autorizado. Por favor, faça login para continuar.');
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/reviews/admin/clear`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+      },
+    });
+    
+    const data = await response.json();
+    
+    if (response.status === 401) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      throw new Error(data.message || 'Sua sessão expirou. Por favor, faça login novamente.');
+    }
+
+    if (response.status === 403) {
+      throw new Error(data.message || 'Você não tem permissão para realizar esta ação.');
+    }
+
+    if (!response.ok) {
+      throw new Error(data.message || `Erro ao limpar avaliações: ${response.statusText}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Erro ao limpar avaliações:', error);
+    throw error;
+  }
+};
+
+export const createRoom = async (roomData: any) => {
+  try {
+    const authToken = localStorage.getItem('authToken');
+    
+    if (!authToken) {
+      throw new Error('Não autorizado. Por favor, faça login para continuar.');
+    }
+
+    console.log('Enviando dados do quarto:', roomData);
+    
+    const response = await fetch(`${API_BASE_URL}/rooms`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+      },
+      body: roomData, // FormData já inclui o Content-Type correto
+    });
+    
+    const data = await response.json();
+    
+    if (response.status === 401) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      throw new Error(data.message || 'Sua sessão expirou. Por favor, faça login novamente.');
+    }
+
+    if (response.status === 403) {
+      throw new Error(data.message || 'Você não tem permissão para realizar esta ação.');
+    }
+
+    if (!response.ok) {
+      console.error('Erro na resposta:', data);
+      throw new Error(data.message || `Erro ao criar quarto: ${response.statusText}`);
+    }
+
+    console.log('Quarto criado com sucesso:', data);
+    return data;
+  } catch (error) {
+    console.error('Erro ao criar quarto:', error);
+    throw error;
+  }
+};
+
+export const updateRoom = async (roomId: string, roomData: any) => {
+  try {
+    const authToken = localStorage.getItem('authToken');
+    
+    if (!authToken) {
+      throw new Error('Não autorizado. Por favor, faça login para continuar.');
+    }
+
+    console.log('Atualizando quarto:', roomId);
+    console.log('Dados para atualização:', roomData);
+    
+    const response = await fetch(`${API_BASE_URL}/rooms/${roomId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+      },
+      body: roomData instanceof FormData ? roomData : JSON.stringify(roomData),
+    });
+    
+    const data = await response.json();
+    
+    if (response.status === 401) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      throw new Error(data.message || 'Sua sessão expirou. Por favor, faça login novamente.');
+    }
+
+    if (response.status === 403) {
+      throw new Error(data.message || 'Você não tem permissão para realizar esta ação.');
+    }
+
+    if (!response.ok) {
+      console.error('Erro na resposta:', data);
+      throw new Error(data.message || `Erro ao atualizar quarto: ${response.statusText}`);
+    }
+
+    console.log('Quarto atualizado com sucesso:', data);
+    return data;
+  } catch (error) {
+    console.error('Erro ao atualizar quarto:', error);
+    throw error;
+  }
+};
+
+export const deleteRoom = async (roomId: string) => {
+  try {
+    const authToken = localStorage.getItem('authToken');
+    
+    if (!authToken) {
+      throw new Error('Não autorizado. Por favor, faça login para continuar.');
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/rooms/${roomId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+      },
+    });
+    
+    const data = await response.json();
+    
+    if (response.status === 401) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      throw new Error(data.message || 'Sua sessão expirou. Por favor, faça login novamente.');
+    }
+
+    if (response.status === 403) {
+      throw new Error(data.message || 'Você não tem permissão para realizar esta ação.');
+    }
+
+    if (!response.ok) {
+      throw new Error(data.message || `Erro ao deletar quarto: ${response.statusText}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Erro ao deletar quarto:', error);
     throw error;
   }
 }; 

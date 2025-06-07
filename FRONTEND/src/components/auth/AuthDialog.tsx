@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import LoginForm from './LoginForm';
 import RegisterForm from './RegisterForm';
 import { useAuth } from '@/hooks/use-auth';
@@ -49,6 +48,16 @@ const AuthDialog: React.FC<AuthDialogProps> = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>
+            {view === 'login' ? 'Entrar na sua conta' : 'Criar uma conta'}
+          </DialogTitle>
+          <DialogDescription>
+            {view === 'login' 
+              ? 'Digite seu e-mail e senha para acessar sua conta'
+              : 'Preencha os dados abaixo para criar sua conta'}
+          </DialogDescription>
+        </DialogHeader>
         {view === 'login' ? (
           <LoginForm 
             onLoginSuccess={handleLoginSuccess} 

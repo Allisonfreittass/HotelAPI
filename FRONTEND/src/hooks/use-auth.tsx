@@ -11,7 +11,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   isLoggedIn: boolean;
-  login: (userData: User) => void;
+  login: (userData: User, token: string) => void;
   logout: () => void;
   updateUser: (updatedUser: User) => void; // Nova função para atualizar o usuário
 }
@@ -24,26 +24,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     // Verificar se o usuário está logado ao carregar a página
-    const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    const token = localStorage.getItem('authToken');
+    const userStr = localStorage.getItem('user');
     
-    if (loggedIn) {
-      const userStr = localStorage.getItem('user');
-      if (userStr) {
-        setUser(JSON.parse(userStr));
-        setIsLoggedIn(true);
-      }
+    if (token && userStr) {
+      setUser(JSON.parse(userStr));
+      setIsLoggedIn(true);
     }
   }, []);
 
-  const login = (userData: User) => {
+  const login = (userData: User, token: string) => {
     setUser(userData);
     setIsLoggedIn(true);
     localStorage.setItem('user', JSON.stringify(userData));
-    localStorage.setItem('isLoggedIn', 'true');
+    localStorage.setItem('authToken', token);
   };
 
   const logout = () => {
-    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('authToken');
     localStorage.removeItem('user');
     setUser(null);
     setIsLoggedIn(false);

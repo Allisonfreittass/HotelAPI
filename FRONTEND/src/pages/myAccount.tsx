@@ -72,11 +72,11 @@ const UserAccount: React.FC = () => {
         <CardContent className="space-y-4 p-6 text-gray-800 dark:text-gray-200">
           <div className="flex items-center space-x-4">
             <img
-              src={profilePic || '/default-profile.png'}
+              src={profilePic || '/images/sem-perfil.jpg'}
               alt="Profile"
               className="w-20 h-20 rounded-full object-cover border-2 border-brand-accent"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = '/default-profile.png';
+                (e.target as HTMLImageElement).src = '/images/sem-perfil.jpg';
               }}
             />
             <div>

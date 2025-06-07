@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { is } from 'date-fns/locale';
-import { fetchRooms, createBooking, loginUser, fetchUserBookings } from '@/services/api';
+import { fetchRooms, createBooking, loginUser, fetchUserBookings, cancelBooking } from '@/services/api';
 import { useAuth } from '@/hooks/use-auth';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -326,6 +326,65 @@ const ChatBot: React.FC = () => {
         };
         break;
 
+      case 'cancelar_reserva':
+        if (!user) {
+          botResponse.text = 'Você precisa estar logado para cancelar uma reserva. Por favor, faça login primeiro.';
+          botResponse.options = [
+            { text: 'Fazer login', action: 'login' },
+            { text: 'Voltar ao início', action: 'inicio' },
+          ];
+          break;
+        }
+        try {
+          const userBookings = await fetchUserBookings(user._id);
+          if (userBookings && userBookings.length > 0) {
+            botResponse.text = 'Qual reserva você gostaria de cancelar?';
+            botResponse.options = userBookings.map((booking: any) => ({
+              text: `Quarto ${booking.room.roomNumber} - Check-in: ${new Date(booking.checkInDate).toLocaleDateString()}`,
+              action: `confirmar_cancelamento_${booking._id}`
+            }));
+            botResponse.options.push({ text: 'Voltar ao início', action: 'inicio' });
+          } else {
+            botResponse.text = 'Você não tem reservas ativas para cancelar.';
+            botResponse.options = [
+              { text: 'Voltar ao início', action: 'inicio' },
+            ];
+          }
+        } catch (error) {
+          botResponse.text = 'Desculpe, não consegui buscar suas reservas. Tente novamente mais tarde.';
+          botResponse.options = [
+            { text: 'Voltar ao início', action: 'inicio' },
+          ];
+        }
+        break;
+
+      case 'confirmar_cancelamento':
+        const bookingId = action.replace('confirmar_cancelamento_', '');
+        botResponse.text = 'Tem certeza que deseja cancelar esta reserva? Esta ação não pode ser desfeita.';
+        botResponse.options = [
+          { text: 'Sim, cancelar reserva', action: `executar_cancelamento_${bookingId}` },
+          { text: 'Não, manter reserva', action: 'duvida_reserva' },
+        ];
+        break;
+
+      case 'executar_cancelamento':
+        const cancelBookingId = action.replace('executar_cancelamento_', '');
+        try {
+          await cancelBooking(cancelBookingId);
+          botResponse.text = '✅ Sua reserva foi cancelada com sucesso! Você receberá um e-mail com a confirmação do cancelamento.';
+          botResponse.options = [
+            { text: 'Ver minhas reservas', action: 'duvida_reserva' },
+            { text: 'Voltar ao início', action: 'inicio' },
+          ];
+        } catch (error) {
+          botResponse.text = 'Desculpe, não foi possível cancelar sua reserva. Por favor, tente novamente mais tarde ou entre em contato com nossa recepção.';
+          botResponse.options = [
+            { text: 'Tentar novamente', action: 'cancelar_reserva' },
+            { text: 'Voltar ao início', action: 'inicio' },
+          ];
+        }
+        break;
+
       default:
         if (action.startsWith('selecionar_quarto_')) {
           const roomId = action.replace('selecionar_quarto_', '');
@@ -342,6 +401,10 @@ const ChatBot: React.FC = () => {
             { text: 'Não, escolher outro quarto', action: 'info_quartos' },
             { text: 'Não, recomeçar', action: 'reserva' },
           ];
+        } else if (action.startsWith('confirmar_cancelamento_')) {
+          handleOptionClick('confirmar_cancelamento');
+        } else if (action.startsWith('executar_cancelamento_')) {
+          handleOptionClick('executar_cancelamento');
         } else {
           botResponse.text = 'Desculpe, não entendi sua solicitação. Como posso te ajudar?';
           botResponse.options = initialMessages[0].options;
@@ -387,7 +450,7 @@ const ChatBot: React.FC = () => {
       } else {
         botResponse.text = 'Formato de data inválido. Por favor, use (AAAA-MM-DD, AAAA-MM-DD).';
       }
-    } else if (currentBooking && currentBooking.checkInDate && !currentBooking.room) {
+    } else if (currentBooking && currentBooking.checkInDate && currentBooking.checkOutDate && !currentBooking.room) {
       const roomType = inputValue.trim().toLowerCase();
       try {
         const rooms = await fetchRooms();

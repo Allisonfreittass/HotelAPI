@@ -69,10 +69,9 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onRegisterSuccess, onLoginC
         password: values.password,
       });
 
-      // Login automático após registro (usando o backend)
+      // Login automático após registro
       const result = await loginUser(values.email, values.password);
-      localStorage.setItem('authToken', result.token); // Armazenar authToken, não apenas token
-      login(result.user);
+      login(result.user, result.token);
 
       toast({
         title: "Conta criada!",

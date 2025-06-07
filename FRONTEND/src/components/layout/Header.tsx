@@ -69,14 +69,20 @@ const Header = () => {
           alt="Perfil" 
           className="w-7 h-7 rounded-full object-cover border border-gray-200"
           onError={(e) => {
-            // Fallback para o ícone padrão se a imagem falhar
-            setProfilePic(null);
+            // Fallback para a imagem padrão se a imagem falhar
+            (e.target as HTMLImageElement).src = '/images/sem-perfil.jpg';
           }}
         />
       );
     }
     
-    return <UserCircle size={18} />;
+    return (
+      <img 
+        src="/images/sem-perfil.jpg" 
+        alt="Perfil" 
+        className="w-7 h-7 rounded-full object-cover border border-gray-200"
+      />
+    );
   };
 
   return (
@@ -121,9 +127,14 @@ const Header = () => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    {/* <Link to="/reservas">
-                      <DropdownMenuItem>Minhas Reservas</DropdownMenuItem>
-                    </Link> */}
+                    {user?.isAdmin && (
+                      <>
+                        <Link to="/admin">
+                          <DropdownMenuItem>Painel de Administração</DropdownMenuItem>
+                        </Link>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
                     <Link to="/myAccount">
                       <DropdownMenuItem>Minha Conta</DropdownMenuItem>
                     </Link>

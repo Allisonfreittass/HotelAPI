@@ -52,8 +52,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onRegisterClick }
     setIsLoading(true);
     try {
       const result = await loginUser(values.email, values.password);
-      localStorage.setItem('authToken', result.token);
-      login(result.user);
+      login(result.user, result.token);
 
       toast({
         title: "Login realizado!",
@@ -64,9 +63,14 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onRegisterClick }
         onLoginSuccess();
       }
     } catch (error: any) {
+      console.error('Erro no login:', error);
+      
+      // Mensagem de erro mais amigável
+      const errorMessage = error.message || "Não foi possível fazer login. Verifique suas credenciais.";
+      
       toast({
         title: "Erro ao fazer login",
-        description: error?.message || "Verifique suas credenciais e tente novamente.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

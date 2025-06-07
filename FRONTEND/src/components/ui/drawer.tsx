@@ -47,6 +47,12 @@ const DrawerContent = React.forwardRef<
       {...props}
     >
       <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
+      <DrawerHeader>
+        <DrawerTitle>Menu</DrawerTitle>
+        <DrawerDescription>
+          Navegue pelas opções do menu
+        </DrawerDescription>
+      </DrawerHeader>
       {children}
     </DrawerPrimitive.Content>
   </DrawerPortal>

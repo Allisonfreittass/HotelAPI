@@ -80,24 +80,24 @@ const RoomsSection: React.FC = () => {
     {
       image: solteiroDuploImage, // Usar imagem local
       title: "Solteiro",
-      description: "Quarto confortável com cama de solteiro e banheiro privativo.",
-      price: 110,
+      description: "Quarto confortável com cama de solteiro e banheiro privativo e ventilador.",
+      price: 140,
       capacity: 1,
       features: ["Wi-Fi", "TV", "Frigobar"]
     },
     {
       image: solteiroDuploImage, // Usar imagem local
-      title: "Solteiro com Ar Condicionado",
+      title: "Duplo",
       description: "Quarto individual com ar-condicionado e janela com vista para o jardim.",
-      price: 150,
+      price: 240,
       capacity: 1,
       features: ["Wi-Fi", "TV", "Frigobar", "Ar-condicionado"]
     },
     {
       image: casalImage, // Usar imagem local
-      title: "Casal",
+      title: "Casal com Ar Condicionado",
       description: "Quarto espaçoso com cama de casal e amenidades para um casal.",
-      price: 190,
+      price: 270,
       capacity: 2,
       features: ["Wi-Fi", "TV", "Frigobar", "Chuveiro duplo"]
     },
