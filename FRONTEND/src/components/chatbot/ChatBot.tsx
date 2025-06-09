@@ -36,6 +36,7 @@ const initialMessages: Message[] = [
       { text: 'Conhecer os serviços do hotel', action: 'servicos' },
       { text: 'Preciso de ajuda', action: 'suporte' },
       { text: 'Deixar um feedback', action: 'feedback' },
+      { text: 'Falar com atendente', action: 'whatsapp' },
     ],
   },
 ];
@@ -202,24 +203,58 @@ const ChatBot: React.FC = () => {
             { text: 'Fazer login', action: 'login' },
             { text: 'Voltar ao início', action: 'inicio' },
           ];
-          break;
-        }
-        try {
-          const userBookings = await fetchUserBookings(user._id);
-          if (userBookings && userBookings.length > 0) {
-            botResponse.text = 'Aqui estão suas reservas:';
-            userBookings.forEach((booking: any) => {
-              botResponse.text += `\n- Quarto: ${booking.room.roomNumber}, Check-in: ${new Date(booking.checkInDate).toLocaleDateString()}, Check-out: ${new Date(booking.checkOutDate).toLocaleDateString()}, Status: ${booking.status}`;
-            });
-          } else {
-            botResponse.text = 'Você não tem reservas no momento.';
+        } else {
+          try {
+            const userBookings = await fetchUserBookings(user._id);
+            if (userBookings && userBookings.length > 0) {
+              botResponse.text = 'Aqui estão suas reservas ativas:';
+              botResponse.options = userBookings
+                .filter((booking: any) => booking.status !== 'cancelled')
+                .map((booking: any) => ({
+                  text: `Quarto ${booking.room?.roomNumber} - Check-in: ${format(new Date(booking.checkInDate), 'dd/MM/yyyy')}`,
+                  action: `confirmar_cancelamento_${booking._id}`
+                }));
+              botResponse.options.push({ text: 'Voltar ao início', action: 'inicio' });
+            } else {
+              botResponse.text = 'Você não possui reservas ativas no momento.';
+              botResponse.options = [
+                { text: 'Fazer uma reserva', action: 'reserva' },
+                { text: 'Voltar ao início', action: 'inicio' },
+              ];
+            }
+          } catch (error) {
+            botResponse.text = 'Desculpe, não consegui buscar suas reservas. Tente novamente mais tarde.';
+            botResponse.options = [
+              { text: 'Voltar ao início', action: 'inicio' },
+            ];
           }
+        }
+        break;
+
+      case action.match(/^confirmar_cancelamento_(.+)$/)?.input:
+        const bookingId = action.split('_')[2];
+        botResponse.text = 'Tem certeza que deseja cancelar esta reserva? Esta ação não pode ser desfeita.';
+        botResponse.options = [
+          { text: 'Sim, cancelar reserva', action: `executar_cancelamento_${bookingId}` },
+          { text: 'Não, manter reserva', action: 'duvida_reserva' },
+        ];
+        break;
+
+      case action.match(/^executar_cancelamento_(.+)$/)?.input:
+        const cancelBookingId = action.split('_')[2];
+        try {
+          await cancelBooking(cancelBookingId);
+          botResponse.text = '✅ Sua reserva foi cancelada com sucesso! Você receberá um e-mail com a confirmação do cancelamento.';
           botResponse.options = [
+            { text: 'Ver minhas reservas', action: 'duvida_reserva' },
             { text: 'Voltar ao início', action: 'inicio' },
           ];
         } catch (error) {
-          botResponse.text = 'Desculpe, não consegui buscar suas reservas. Tente novamente mais tarde.';
-          console.error('Erro ao buscar reservas:', error);
+          botResponse.text = 'Desculpe, não foi possível cancelar sua reserva. Por favor, tente novamente mais tarde ou entre em contato com nossa recepção.';
+          botResponse.options = [
+            { text: 'Tentar novamente', action: 'duvida_reserva' },
+            { text: 'Voltar ao início', action: 'inicio' },
+          ];
         }
         break;
 
@@ -281,6 +316,7 @@ const ChatBot: React.FC = () => {
           { text: 'Problema com TV a cabo.', action: 'tv_problema' },
           { text: 'Ar-condicionado não liga.', action: 'ar_problema' },
           { text: 'Outro problema.', action: 'outro_problema' },
+          { text: 'Falar com atendente no WhatsApp', action: 'whatsapp' },
         ];
         break;
 
@@ -358,31 +394,23 @@ const ChatBot: React.FC = () => {
         }
         break;
 
-      case 'confirmar_cancelamento':
-        const bookingId = action.replace('confirmar_cancelamento_', '');
-        botResponse.text = 'Tem certeza que deseja cancelar esta reserva? Esta ação não pode ser desfeita.';
+      case 'whatsapp':
+        const phoneNumber = '5535997671999';
+        const message = 'Olá, gostaria de falar com um atendente do Hotel Vitória.';
+        const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+        window.open(whatsappUrl, '_blank');
+        botResponse.text = 'Você será redirecionado para o WhatsApp. Se precisar de mais ajuda, estou aqui!';
         botResponse.options = [
-          { text: 'Sim, cancelar reserva', action: `executar_cancelamento_${bookingId}` },
-          { text: 'Não, manter reserva', action: 'duvida_reserva' },
+          { text: 'Voltar ao início', action: 'inicio' },
         ];
         break;
 
-      case 'executar_cancelamento':
-        const cancelBookingId = action.replace('executar_cancelamento_', '');
-        try {
-          await cancelBooking(cancelBookingId);
-          botResponse.text = '✅ Sua reserva foi cancelada com sucesso! Você receberá um e-mail com a confirmação do cancelamento.';
-          botResponse.options = [
-            { text: 'Ver minhas reservas', action: 'duvida_reserva' },
-            { text: 'Voltar ao início', action: 'inicio' },
-          ];
-        } catch (error) {
-          botResponse.text = 'Desculpe, não foi possível cancelar sua reserva. Por favor, tente novamente mais tarde ou entre em contato com nossa recepção.';
-          botResponse.options = [
-            { text: 'Tentar novamente', action: 'cancelar_reserva' },
-            { text: 'Voltar ao início', action: 'inicio' },
-          ];
-        }
+      case 'outro_problema':
+        botResponse.text = 'Para melhor atendê-lo, sugiro entrar em contato diretamente com nossa equipe.';
+        botResponse.options = [
+          { text: 'Falar com atendente no WhatsApp', action: 'whatsapp' },
+          { text: 'Voltar ao início', action: 'inicio' },
+        ];
         break;
 
       default:

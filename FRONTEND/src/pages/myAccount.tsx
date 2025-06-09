@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { fetchCurrentUser, updateUser, fetchUserBookings } from '@/services/api';
+import { fetchCurrentUser, updateUser, fetchUserBookings, cancelBooking } from '@/services/api';
 
 const UserAccount: React.FC = () => {
   const { user, updateUser: updateAuthUser } = useAuth();
@@ -16,6 +16,7 @@ const UserAccount: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [bookings, setBookings] = useState<any[]>([]);
+  const [cancelling, setCancelling] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -59,6 +60,27 @@ const UserAccount: React.FC = () => {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCancel = async (bookingId: string) => {
+    if (!window.confirm('Tem certeza que deseja cancelar esta reserva?')) return;
+    setCancelling(bookingId);
+    try {
+      await cancelBooking(bookingId);
+      setBookings((prev) => prev.map(b => b._id === bookingId ? { ...b, status: 'cancelled' } : b));
+      toast({
+        title: 'Reserva cancelada',
+        description: 'Sua reserva foi cancelada com sucesso.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao cancelar',
+        description: error?.message || 'Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setCancelling(null);
     }
   };
 
@@ -125,13 +147,31 @@ const UserAccount: React.FC = () => {
           ) : bookings.length === 0 ? (
             <p className="text-center text-gray-600 dark:text-gray-300">Nenhuma reserva encontrada.</p>
           ) : (
-            <ul className="list-disc pl-4 text-gray-800 dark:text-gray-200">
+            <div className="space-y-4">
               {bookings.map((booking) => (
-                <li key={booking._id} className="mb-2">
-                  Quarto: <b className="text-brand-dark dark:text-brand-accent">{booking.room?.type || 'N/A'}</b> - Check-in: {new Date(booking.checkInDate).toLocaleDateString()} - Check-out: {new Date(booking.checkOutDate).toLocaleDateString()} - Status: <b className={booking.status === 'cancelled' ? 'text-red-600' : 'text-green-500 dark:text-green-400'}>{booking.status}</b>
-                </li>
+                <div key={booking._id} className="border rounded-lg p-4 bg-white dark:bg-hotel-900">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-semibold">Quarto: {booking.room?.type || 'N/A'}</p>
+                      <p>Check-in: {new Date(booking.checkInDate).toLocaleDateString()}</p>
+                      <p>Check-out: {new Date(booking.checkOutDate).toLocaleDateString()}</p>
+                      <p>Status: <span className={booking.status === 'cancelled' ? 'text-red-600' : 'text-green-500 dark:text-green-400'}>{booking.status}</span></p>
+                      <p>Valor total: R$ {booking.totalPrice}</p>
+                    </div>
+                    {booking.status !== 'cancelled' && (
+                      <Button 
+                        variant="destructive" 
+                        onClick={() => handleCancel(booking._id)} 
+                        disabled={cancelling === booking._id}
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                      >
+                        {cancelling === booking._id ? 'Cancelando...' : 'Cancelar Reserva'}
+                      </Button>
+                    )}
+                  </div>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
         </CardContent>
       </Card>

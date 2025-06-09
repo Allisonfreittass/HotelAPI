@@ -5,8 +5,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { fetchRooms, createRoom, updateRoom, deleteRoom } from '@/services/api';
-import { Plus, Pencil, Trash2, Loader2, Image as ImageIcon, Calendar, Lock, Unlock, Mail, FileText, Printer, Phone, MessageSquare, Clock, History, Filter, BarChart2, Download, Share2, MoreHorizontal, Check } from 'lucide-react';
+import { fetchRooms, createRoom, updateRoom, deleteRoom, cancelBooking } from '@/services/api';
+import { Plus, Pencil, Trash2, Loader2, Image as ImageIcon, Calendar, Lock, Unlock, Mail, FileText, Printer, Phone, MessageSquare, Clock, History, Filter, BarChart2, Download, Share2, MoreHorizontal, Check, MessageCircle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -215,11 +215,19 @@ const RoomManager: React.FC = () => {
     try {
       const newStatus = !room.isAvailable;
       const message = newStatus 
-        ? "Tem certeza que deseja liberar este quarto?" 
+        ? "Tem certeza que deseja liberar este quarto? Isso irá cancelar a reserva atual." 
         : "Tem certeza que deseja marcar este quarto como ocupado?";
 
       if (!window.confirm(message)) {
         return;
+      }
+
+      // Se estiver liberando o quarto, cancelar a reserva ativa
+      if (newStatus && room.bookings) {
+        const activeBooking = room.bookings.find(booking => booking.status !== 'cancelled');
+        if (activeBooking) {
+          await cancelBooking(activeBooking._id);
+        }
       }
 
       await updateRoom(room._id, {
@@ -235,7 +243,7 @@ const RoomManager: React.FC = () => {
       toast({
         title: newStatus ? "Quarto liberado" : "Quarto ocupado",
         description: newStatus 
-          ? "O quarto foi liberado com sucesso." 
+          ? "O quarto foi liberado e a reserva foi cancelada com sucesso." 
           : "O quarto foi marcado como ocupado.",
       });
 
@@ -491,6 +499,13 @@ const RoomManager: React.FC = () => {
       title: "Em desenvolvimento",
       description: "Esta funcionalidade estará disponível em breve.",
     });
+  };
+
+  const handleWhatsAppContact = (booking: Booking) => {
+    const phoneNumber = '5535997671999';
+    const message = `Olá, sou ${booking.user.username} e tenho uma reserva no hotel. Gostaria de conversar sobre a reserva #${booking._id}.`;
+    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
   };
 
   return (
@@ -751,6 +766,7 @@ const RoomManager: React.FC = () => {
                                   if (value === 'call') handleCallGuest(booking);
                                   else if (value === 'message') handleSendMessage(booking);
                                   else if (value === 'timeline') handleViewTimeline(booking);
+                                  else if (value === 'whatsapp') handleWhatsAppContact(booking);
                                 }}>
                                   <SelectTrigger className="w-[120px] flex items-center justify-center gap-1">
                                     <MoreHorizontal className="h-4 w-4" />
@@ -764,6 +780,11 @@ const RoomManager: React.FC = () => {
                                         </div>
                                       </SelectItem>
                                     )}
+                                    <SelectItem value="whatsapp">
+                                      <div className="flex items-center gap-2">
+                                        <MessageCircle className="h-4 w-4" /> WhatsApp
+                                      </div>
+                                    </SelectItem>
                                     <SelectItem value="message">
                                       <div className="flex items-center gap-2">
                                         <MessageSquare className="h-4 w-4" /> Mensagem
